@@ -1,13 +1,15 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { LogOut } from "lucide-react";
 import { DASHBOARD_NAV } from "@/config/navigation";
 import { hasPermission } from "@/lib/permissions";
 import type { AppRole } from "@/types";
 import { cn } from "@/lib/utils";
+import { signOut } from "@/server/actions/auth";
 
-export function Sidebar({ role }: { role: AppRole | null }) {
+export function Sidebar({ role, email }: { role: AppRole | null; email?: string }) {
   const pathname = usePathname();
 
   return (
@@ -38,6 +40,20 @@ export function Sidebar({ role }: { role: AppRole | null }) {
           );
         })}
       </nav>
+      <div className="border-sidebar-border space-y-2 border-t p-3">
+        {email && (
+          <p className="text-sidebar-foreground/60 truncate px-3 text-xs">{email}</p>
+        )}
+        <form action={signOut}>
+          <button
+            type="submit"
+            className="text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors"
+          >
+            <LogOut className="size-4" />
+            Sign out
+          </button>
+        </form>
+      </div>
     </aside>
   );
 }

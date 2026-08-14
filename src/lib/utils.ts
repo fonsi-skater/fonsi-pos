@@ -1,4 +1,4 @@
-import { clsx, type ClassValue } from "clsx";
+﻿import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
 /**
@@ -40,4 +40,16 @@ export function generateReference(prefix: string = "RCPT") {
   const timestamp = Date.now().toString(36).toUpperCase();
   const random = Math.random().toString(36).slice(2, 6).toUpperCase();
   return `${prefix}-${timestamp}-${random}`;
+}
+
+/** Turn a business name into a URL-safe slug, with a short random suffix
+ * to avoid collisions (e.g. "Acme Traders Ltd" -> "acme-traders-ltd-4f2a"). */
+export function slugify(input: string) {
+  const base = input
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+  const suffix = Math.random().toString(36).slice(2, 6);
+  return `${base}-${suffix}`;
 }

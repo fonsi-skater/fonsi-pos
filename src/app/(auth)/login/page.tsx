@@ -1,11 +1,24 @@
+﻿"use client";
+
 import Link from "next/link";
+import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { signIn, type AuthActionState } from "@/server/actions/auth";
 
-// TODO (Phase 2): wire up React Hook Form + Zod + Supabase Auth sign-in.
+const initialState: AuthActionState = { success: false };
+
 export default function LoginPage() {
+  const [state, formAction, isPending] = useActionState(signIn, initialState);
+
   return (
     <main className="flex flex-1 items-center justify-center px-4">
       <Card className="w-full max-w-sm">
@@ -13,24 +26,35 @@ export default function LoginPage() {
           <CardTitle>Sign in to Fonsi POS</CardTitle>
           <CardDescription>Enter your email and password to continue.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" placeholder="you@business.com" disabled />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input id="password" type="password" placeholder="••••••••" disabled />
-          </div>
-          <Button className="w-full" disabled>
-            Sign in (Phase 2)
-          </Button>
-          <p className="text-muted-foreground text-center text-sm">
-            No account?{" "}
-            <Link href="/register" className="text-foreground underline underline-offset-4">
-              Create a business
-            </Link>
-          </p>
+        <CardContent>
+          <form action={formAction} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" name="email" type="email" placeholder="you@business.com" required />
+              {state.fieldErrors?.email && (
+                <p className="text-destructive text-sm">{state.fieldErrors.email[0]}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input id="password" name="password" type="password" placeholder="••••••••" required />
+              {state.fieldErrors?.password && (
+                <p className="text-destructive text-sm">{state.fieldErrors.password[0]}</p>
+              )}
+            </div>
+            {state.message && !state.success && (
+              <p className="text-destructive text-sm">{state.message}</p>
+            )}
+            <Button type="submit" className="w-full" disabled={isPending}>
+              {isPending ? "Signing in..." : "Sign in"}
+            </Button>
+            <p className="text-muted-foreground text-center text-sm">
+              No account?{" "}
+              <Link href="/register" className="text-foreground underline underline-offset-4">
+                Create a business
+              </Link>
+            </p>
+          </form>
         </CardContent>
       </Card>
     </main>
