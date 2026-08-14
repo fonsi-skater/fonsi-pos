@@ -1,18 +1,16 @@
-﻿import { createServerClient } from "@supabase/ssr";
+import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import type { Database } from "@/types/database";
 
 /**
  * Server-side Supabase client for use in Server Components, Route Handlers,
  * and Server Actions. Reads the user's session from cookies so RLS policies
  * apply as the authenticated user (never the service role).
- *
- * NOTE: not yet typed against the generated Database schema — see the note
- * in src/lib/supabase/client.ts. Re-add `<Database>` once Phase 3 lands.
  */
 export async function createClient() {
   const cookieStore = await cookies();
 
-  return createServerClient(
+  return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {

@@ -1,4 +1,4 @@
-﻿-- Phase 2: Auth foundation
+-- Phase 2: Auth foundation
 -- Minimal schema needed for sign-up (business creation + membership/role).
 -- Full product/inventory/sales schema arrives in the Phase 3 migration.
 
