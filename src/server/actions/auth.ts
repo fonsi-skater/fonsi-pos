@@ -32,7 +32,7 @@ export async function signIn(
 
   if (error) {
     console.error("[signIn] Supabase error:", error.message);
-    return { success: false, message: error.message };
+    return { success: false, message: "Invalid email or password." };
   }
 
   redirect("/dashboard");
