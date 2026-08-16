@@ -1,4 +1,4 @@
-﻿# Fonsi POS — POS Screen Design System
+# Fonsi POS — POS Screen Design System
 
 Applies to: the checkout screen (`/pos`), the embeddable POS (`/embed/pos`),
 and receipts. **Not** the back-office dashboard (products, inventory,
