@@ -20,11 +20,19 @@ export function PosScreen({
   customers,
   branchId,
   branchName,
+  embedToken,
 }: {
   initialProducts: PosProduct[];
   customers: Customer[];
   branchId: string;
   branchName: string;
+  /**
+   * Set only when rendered from /embed/pos. Hides the "Dashboard" link
+   * (there's no admin session to return to on an embedded, iframed
+   * surface) and gets forwarded down to checkout so the server can
+   * resolve the sale against the embed token instead of a cookie session.
+   */
+  embedToken?: string;
 }) {
   const [filtered, setFiltered] = useState(initialProducts);
 
@@ -37,13 +45,15 @@ export function PosScreen({
         </div>
         <div className="flex items-center gap-3">
           <ConnectivityStatus />
-          <Link
-            href="/dashboard"
-            className="pos-glass flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium"
-          >
-            <LayoutDashboard className="size-3.5" />
-            Dashboard
-          </Link>
+          {!embedToken && (
+            <Link
+              href="/dashboard"
+              className="pos-glass flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium"
+            >
+              <LayoutDashboard className="size-3.5" />
+              Dashboard
+            </Link>
+          )}
         </div>
       </header>
 
@@ -55,7 +65,7 @@ export function PosScreen({
           </div>
         </div>
         <div className="overflow-hidden">
-          <CartPanel branchId={branchId} customers={customers} />
+          <CartPanel branchId={branchId} customers={customers} embedToken={embedToken} />
         </div>
       </div>
     </div>

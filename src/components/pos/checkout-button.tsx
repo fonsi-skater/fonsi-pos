@@ -7,7 +7,7 @@ import { formatCurrency } from "@/lib/utils";
 import { useCartStore } from "@/stores/cart-store";
 import { checkoutSale } from "@/server/actions/pos";
 
-export function CheckoutButton({ branchId }: { branchId: string }) {
+export function CheckoutButton({ branchId, embedToken }: { branchId: string; embedToken?: string }) {
   const items = useCartStore((s) => s.items);
   const customerId = useCartStore((s) => s.customerId);
   const paymentMethod = useCartStore((s) => s.paymentMethod);
@@ -31,6 +31,7 @@ export function CheckoutButton({ branchId }: { branchId: string }) {
           quantity: i.quantity,
         })),
         manualDiscount: 0,
+        embedToken,
       });
 
       if (result.success) {

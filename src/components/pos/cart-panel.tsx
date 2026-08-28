@@ -14,7 +14,15 @@ interface Customer {
   phone: string | null;
 }
 
-export function CartPanel({ branchId, customers }: { branchId: string; customers: Customer[] }) {
+export function CartPanel({
+  branchId,
+  customers,
+  embedToken,
+}: {
+  branchId: string;
+  customers: Customer[];
+  embedToken?: string;
+}) {
   const items = useCartStore((s) => s.items);
   const getEstimatedTotal = useCartStore((s) => s.getEstimatedTotal);
 
@@ -61,7 +69,7 @@ export function CartPanel({ branchId, customers }: { branchId: string; customers
 
       <div className="mt-3 space-y-3">
         <PaymentMethodSelector />
-        <CheckoutButton branchId={branchId} />
+        <CheckoutButton branchId={branchId} embedToken={embedToken} />
       </div>
     </div>
   );

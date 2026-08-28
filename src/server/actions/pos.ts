@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { checkoutSchema, type CheckoutInput } from "@/lib/validations/pos";
 import { requirePermission } from "@/server/services/authorize";
+import { resolveEmbedToken } from "@/server/services/embed-auth";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { getPaymentProvider } from "@/lib/payments";
 import { generateReference } from "@/lib/utils";
+import type { SessionContext } from "@/types";
 
 export interface CheckoutResult {
   success: boolean;
@@ -31,17 +33,44 @@ export interface CheckoutResult {
  * true atomicity — tracked as a known gap, not silently ignored.
  */
 export async function checkoutSale(input: CheckoutInput): Promise<CheckoutResult> {
-  const session = await requirePermission(PERMISSIONS.PROCESS_SALES);
   const parsed = checkoutSchema.safeParse(input);
 
   if (!parsed.success) {
     return { success: false, message: parsed.error.issues[0]?.message ?? "Invalid checkout request." };
   }
 
-  const { branchId, customerId, paymentMethod, items, manualDiscount, customerPhone } = parsed.data;
+  const { customerId, paymentMethod, items, customerPhone } = parsed.data;
+  let branchId = parsed.data.branchId;
+  let manualDiscount = parsed.data.manualDiscount;
+  let session: SessionContext;
 
-  if (manualDiscount > 0 && !hasPermission(session.role, PERMISSIONS.APPROVE_DISCOUNTS)) {
-    return { success: false, message: "You're not authorized to apply a discount." };
+  if (parsed.data.embedToken) {
+    // Embed checkouts (src/app/embed/pos/page.tsx) have no dashboard
+    // session — the token itself is the authorization, resolved to a
+    // fixed business/branch. `branchId` from the request is ignored in
+    // favor of the token's own scope: an unauthenticated embed request
+    // never gets to pick which branch it sells against.
+    const embedAuth = await resolveEmbedToken(parsed.data.embedToken);
+    if (!embedAuth) {
+      return { success: false, message: "This embed link is invalid or has been revoked." };
+    }
+    branchId = embedAuth.branchId;
+    // No role above cashier exists in the embed flow, and discounts
+    // require a real, session-checked APPROVE_DISCOUNTS grant — so
+    // embed checkouts never carry one, regardless of what was requested.
+    manualDiscount = 0;
+    session = {
+      userId: embedAuth.cashierId,
+      email: "",
+      businessId: embedAuth.businessId,
+      branchId: embedAuth.branchId,
+      role: "cashier",
+    };
+  } else {
+    session = await requirePermission(PERMISSIONS.PROCESS_SALES);
+    if (manualDiscount > 0 && !hasPermission(session.role, PERMISSIONS.APPROVE_DISCOUNTS)) {
+      return { success: false, message: "You're not authorized to apply a discount." };
+    }
   }
 
   const supabase = await createClient();

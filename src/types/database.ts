@@ -1031,6 +1031,42 @@ export interface Database {
         };
         Relationships: [];
       };
+      embed_tokens: {
+        Row: {
+          id: string;
+          business_id: string;
+          branch_id: string;
+          token_hash: string;
+          label: string | null;
+          is_active: boolean;
+          created_by: string | null;
+          last_used_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          branch_id: string;
+          token_hash: string;
+          label?: string | null;
+          is_active?: boolean;
+          created_by?: string | null;
+          last_used_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          branch_id?: string;
+          token_hash?: string;
+          label?: string | null;
+          is_active?: boolean;
+          created_by?: string | null;
+          last_used_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
