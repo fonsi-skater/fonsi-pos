@@ -161,11 +161,15 @@ form-driven mutations inside the dashboard. Every route:
 ## 7. Payment architecture
 
 `src/lib/payments/index.ts` exposes `getPaymentProvider(method)`, backed by
-`PaymentProvider` implementations (`cash.ts` done; `mpesa.ts` scaffolded,
-full Daraja STK Push + callback verification in Phase 7; card/bank/credit
-follow the same interface later). No payment branching logic lives outside
-this module. M-Pesa payments are only ever marked `success` by the server
-after verifying Daraja's callback — never by trusting the client.
+`PaymentProvider` implementations (`cash.ts`; `mpesa.ts` now does real
+Daraja STK Push + callback verification, Phase 7; card/bank/credit follow
+the same interface later). No payment branching logic lives outside this
+module. M-Pesa payments are only ever marked `success` by
+`src/app/api/payments/mpesa/callback/route.ts` after verifying Daraja's
+callback — never by trusting the client. `src/lib/payments/mpesa/client.ts`
+is the low-level Daraja HTTP client (OAuth, STK Push, STK Push Query);
+`getPaymentStatus` (src/server/actions/payments.ts) is polled by the POS
+UI so the cashier sees the real outcome instead of a permanent "pending".
 
 ## 8. Offline architecture
 

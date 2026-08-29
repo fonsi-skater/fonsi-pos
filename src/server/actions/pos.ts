@@ -184,6 +184,7 @@ export async function checkoutSale(input: CheckoutInput): Promise<CheckoutResult
       amount: totalAmount,
       currency: "KES",
       customerPhone: customerPhone ?? undefined,
+      metadata: { saleNumber },
     });
     paymentStatus = result.status;
     await supabase.from("payment_transactions").insert({
