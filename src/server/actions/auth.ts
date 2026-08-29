@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { loginSchema, registerSchema } from "@/lib/validations/auth";
 import { slugify } from "@/lib/utils";
 
@@ -71,8 +72,24 @@ export async function signUp(
     };
   }
 
-  // 2. Create the business (RLS: any authenticated user may insert one).
-  const { data: business, error: businessError } = await supabase
+  // 2. Create the business + the owner membership.
+  //
+  // Deliberately uses the admin (service-role) client, not the
+  // session-scoped one: if the Supabase project has "Confirm email"
+  // enabled (the default for new projects), signUp() above creates the
+  // user but returns no session until they click the confirmation link
+  // — so auth.uid() is null for the rest of this request, and both
+  // `businesses` and `business_members`'s RLS insert policies require
+  // auth.uid() is not null. Using the RLS-scoped client here would fail
+  // for exactly the accounts most likely to be brand new (this was a
+  // real bug: registration silently failed whenever email confirmation
+  // was on). signUpData.user.id is already a verified real user ID from
+  // Supabase Auth's own response, not client-supplied, so bypassing RLS
+  // for just these two inserts — attributed to that specific, just-created
+  // user — doesn't weaken anything; nothing here is client-controlled.
+  const admin = createAdminClient();
+
+  const { data: business, error: businessError } = await admin
     .from("businesses")
     .insert({
       name: businessName,
@@ -83,6 +100,7 @@ export async function signUp(
     .single();
 
   if (businessError || !business) {
+    console.error("[signUp] business insert error:", businessError);
     return {
       success: false,
       message:
@@ -91,13 +109,14 @@ export async function signUp(
   }
 
   // 3. Make this user the business_owner of the new business.
-  const { error: memberError } = await supabase.from("business_members").insert({
+  const { error: memberError } = await admin.from("business_members").insert({
     business_id: business.id,
     user_id: signUpData.user.id,
     role: "business_owner",
   });
 
   if (memberError) {
+    console.error("[signUp] business_members insert error:", memberError);
     return {
       success: false,
       message:
