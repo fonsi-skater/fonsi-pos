@@ -240,7 +240,15 @@ export interface Database {
           updated_at?: string;
           deleted_at?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "products_category_id_fkey";
+            columns: ["category_id"];
+            isOneToOne: false;
+            referencedRelation: "categories";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       product_variants: {
         Row: {
@@ -1069,7 +1077,35 @@ export interface Database {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      create_sale: {
+        Args: {
+          p_business_id: string;
+          p_branch_id: string;
+          p_cashier_id: string;
+          p_customer_id: string | null;
+          p_sale_number: string;
+          p_receipt_number: string;
+          p_payment_method: Database["public"]["Enums"]["payment_method"];
+          p_manual_discount: number;
+          p_items: {
+            product_id: string;
+            product_variant_id: string | null;
+            quantity: number;
+          }[];
+        };
+        Returns: {
+          sale_id: string;
+          sale_number: string;
+          subtotal: number;
+          discount_amount: number;
+          tax_amount: number;
+          total_amount: number;
+          payment_id: string;
+          payment_status: Database["public"]["Enums"]["payment_status"];
+        }[];
+      };
+    };
     Enums: {
       app_role: AppRole;
       inventory_movement_type: InventoryMovementType;

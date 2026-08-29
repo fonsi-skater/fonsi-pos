@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { checkoutSchema, type CheckoutInput } from "@/lib/validations/pos";
 import { requirePermission } from "@/server/services/authorize";
 import { resolveEmbedToken } from "@/server/services/embed-auth";
@@ -22,15 +23,26 @@ export interface CheckoutResult {
 /**
  * Completes a sale. This is the one place financial totals are computed —
  * the client cart is a UI convenience only; every price, tax rate, and
- * discount here is re-read from the database by product ID, never trusted
- * from the request (spec §10: "Never trust totals sent from the frontend").
+ * discount is re-read from the database by product ID inside the
+ * `create_sale` Postgres function (supabase/migrations/0010_atomic_checkout.sql),
+ * never trusted from the request (spec §10: "Never trust totals sent from
+ * the frontend").
  *
- * NOTE ON ATOMICITY: this does several sequential inserts (sale, sale_items,
- * payment, inventory_movements, customer stats). Supabase's JS client has
- * no multi-statement transaction primitive, so a failure partway through
- * can leave a partial sale. A production hardening pass should move this
- * into a single Postgres function (`create_sale(...)` via `.rpc()`) for
- * true atomicity — tracked as a known gap, not silently ignored.
+ * ATOMICITY: the sale, its line items, the payment row, inventory
+ * movements, customer stats, and the receipt row are all written inside
+ * that single `create_sale` transaction — either the whole sale lands or
+ * none of it does. Only the parts that inherently can't live inside a
+ * database transaction happen out here in Node afterward: the M-Pesa STK
+ * Push (an external HTTP call) and recording its result.
+ *
+ * SECURITY: `create_sale` is SECURITY DEFINER and bypasses RLS, so which
+ * Supabase client calls it matters. Authenticated dashboard checkouts use
+ * the normal RLS-bound client (Postgres still checks the caller actually
+ * holds an `authenticated` session before allowing the call at all).
+ * Embed checkouts have no Supabase auth session — the embed token
+ * resolved above is the authorization instead — so they use the
+ * service-role admin client, same as the M-Pesa callback and embed token
+ * verification elsewhere in this codebase.
  */
 export async function checkoutSale(input: CheckoutInput): Promise<CheckoutResult> {
   const parsed = checkoutSchema.safeParse(input);
@@ -43,6 +55,7 @@ export async function checkoutSale(input: CheckoutInput): Promise<CheckoutResult
   let branchId = parsed.data.branchId;
   let manualDiscount = parsed.data.manualDiscount;
   let session: SessionContext;
+  let isEmbed = false;
 
   if (parsed.data.embedToken) {
     // Embed checkouts (src/app/embed/pos/page.tsx) have no dashboard
@@ -54,6 +67,7 @@ export async function checkoutSale(input: CheckoutInput): Promise<CheckoutResult
     if (!embedAuth) {
       return { success: false, message: "This embed link is invalid or has been revoked." };
     }
+    isEmbed = true;
     branchId = embedAuth.branchId;
     // No role above cashier exists in the embed flow, and discounts
     // require a real, session-checked APPROVE_DISCOUNTS grant — so
@@ -73,198 +87,101 @@ export async function checkoutSale(input: CheckoutInput): Promise<CheckoutResult
     }
   }
 
-  const supabase = await createClient();
+  const supabase = isEmbed ? createAdminClient() : await createClient();
+  const saleNumber = generateReference("SALE");
+  const receiptNumber = generateReference("RCPT");
 
-  // 1. Re-read authoritative prices for every product in the cart.
-  const productIds = items.map((i) => i.productId);
-  const { data: products, error: productsError } = await supabase
-    .from("products")
-    .select("id, selling_price, tax_rate, discount, is_active")
-    .eq("business_id", session.businessId!)
-    .in("id", productIds)
-    .is("deleted_at", null);
-
-  if (productsError || !products || products.length !== new Set(productIds).size) {
-    return { success: false, message: "One or more items in the cart are no longer available." };
-  }
-
-  const productMap = new Map(products.map((p) => [p.id, p]));
-
-  let subtotal = 0;
-  let taxAmount = 0;
-  const saleItemRows = items.map((item) => {
-    const product = productMap.get(item.productId)!;
-    if (!product.is_active) {
-      throw new Error(`Product ${item.productId} is inactive`);
-    }
-    const unitPrice = product.selling_price;
-    const lineDiscount = unitPrice * item.quantity * product.discount;
-    const lineSubtotal = unitPrice * item.quantity - lineDiscount;
-    const lineTax = lineSubtotal * product.tax_rate;
-    subtotal += lineSubtotal;
-    taxAmount += lineTax;
-    return {
+  const { data: rows, error: rpcError } = await supabase.rpc("create_sale", {
+    p_business_id: session.businessId!,
+    p_branch_id: branchId,
+    p_cashier_id: session.userId,
+    p_customer_id: customerId ?? null,
+    p_sale_number: saleNumber,
+    p_receipt_number: receiptNumber,
+    p_payment_method: paymentMethod,
+    p_manual_discount: manualDiscount,
+    p_items: items.map((item) => ({
       product_id: item.productId,
       product_variant_id: item.productVariantId ?? null,
       quantity: item.quantity,
-      unit_price: unitPrice,
-      discount_amount: Number(lineDiscount.toFixed(2)),
-      tax_amount: Number(lineTax.toFixed(2)),
-      subtotal: Number((lineSubtotal + lineTax).toFixed(2)),
-    };
+    })),
   });
 
-  const discountAmount = Math.min(manualDiscount, subtotal);
-  const totalAmount = Number((subtotal - discountAmount + taxAmount).toFixed(2));
-
-  // 2. Create the sale.
-  const saleNumber = generateReference("SALE");
-  const { data: sale, error: saleError } = await supabase
-    .from("sales")
-    .insert({
-      business_id: session.businessId!,
-      branch_id: branchId,
-      customer_id: customerId ?? null,
-      cashier_id: session.userId,
-      sale_number: saleNumber,
-      subtotal: Number(subtotal.toFixed(2)),
-      discount_amount: Number(discountAmount.toFixed(2)),
-      tax_amount: Number(taxAmount.toFixed(2)),
-      total_amount: totalAmount,
-      status: "completed",
-    })
-    .select("id")
-    .single();
-
-  if (saleError || !sale) {
-    console.error("[checkout_sale_insert]", saleError);
-    return { success: false, message: "Something went wrong while processing the sale. Please try again." };
-  }
-
-  // 3. Sale line items.
-  const { error: itemsError } = await supabase
-    .from("sale_items")
-    .insert(saleItemRows.map((row) => ({ ...row, sale_id: sale.id })));
-
-  if (itemsError) {
-    console.error("[checkout_sale_items]", itemsError);
+  if (rpcError || !rows || rows.length === 0) {
+    console.error("[checkout_sale_rpc]", rpcError);
+    // create_sale raises a plain-language message (e.g. "no longer
+    // available") for the cases a cashier can actually act on; anything
+    // else is a genuine server error, not shown verbatim to the client.
+    const isKnownValidationError = rpcError?.code === "P0001";
     return {
       success: false,
-      message: "The sale was started but items couldn't be recorded. Please check Sales and contact support.",
-      saleId: sale.id,
+      message: isKnownValidationError ? rpcError.message : "Something went wrong while processing the sale. Please try again.",
     };
   }
 
-  // 4. Payment. Only M-Pesa requires async/server-verified confirmation
-  // (spec §12) — cash, card, bank, credit, and other are recorded as
-  // confirmed by the cashier at the point of sale, matching how a small
-  // business actually takes those payments today (a card terminal or
-  // bank transfer confirmation happening alongside, not through this app).
-  const { data: payment, error: paymentError } = await supabase
-    .from("payments")
-    .insert({
-      sale_id: sale.id,
-      method: paymentMethod,
-      amount: totalAmount,
-      status: paymentMethod === "mpesa" ? "pending" : "success",
-    })
-    .select("id")
-    .single();
+  const sale = rows[0];
+  // create_sale only ever sets this to "pending" or "success" at
+  // creation time ("failed"/"reversed" only happen later, via the
+  // M-Pesa callback or a refund) — narrow the wider DB enum accordingly.
+  let paymentStatus: CheckoutResult["paymentStatus"] = sale.payment_status as "pending" | "success";
 
-  let paymentStatus: CheckoutResult["paymentStatus"] = "success";
-
-  if (paymentError || !payment) {
-    console.error("[checkout_payment]", paymentError);
-  } else if (paymentMethod === "mpesa") {
+  // M-Pesa's confirmation is inherently out-of-band (Daraja's webhook —
+  // src/app/api/payments/mpesa/callback), and cash/card/etc. are recorded
+  // as confirmed by create_sale already, so only M-Pesa needs a follow-up
+  // external call here. This can't live inside the SQL transaction above
+  // (Postgres can't make outbound HTTP requests), so a failure here — an
+  // unreachable Daraja, a network blip — leaves an already-committed sale
+  // with a "pending" payment rather than corrupting the sale itself.
+  if (paymentMethod === "mpesa") {
     const provider = getPaymentProvider("mpesa");
     const result = await provider.initiate({
-      saleId: sale.id,
+      saleId: sale.sale_id,
       businessId: session.businessId!,
       branchId,
-      amount: totalAmount,
+      amount: sale.total_amount,
       currency: "KES",
       customerPhone: customerPhone ?? undefined,
       metadata: { saleNumber },
     });
     paymentStatus = result.status;
-    await supabase.from("payment_transactions").insert({
-      payment_id: payment.id,
+
+    const { error: txError } = await supabase.from("payment_transactions").insert({
+      payment_id: sale.payment_id,
       provider_reference: result.providerReference,
       idempotency_key: result.idempotencyKey,
       status: result.status,
     });
+    if (txError) console.error("[checkout_mpesa_transaction]", txError);
+
+    if (result.status === "failed") {
+      await supabase.from("payments").update({ status: "failed" }).eq("id", sale.payment_id);
+    }
   } else {
     const provider = getPaymentProvider("cash"); // reuse for immediate-confirm semantics
     const result = await provider.initiate({
-      saleId: sale.id,
+      saleId: sale.sale_id,
       businessId: session.businessId!,
       branchId,
-      amount: totalAmount,
+      amount: sale.total_amount,
       currency: "KES",
     });
-    await supabase.from("payment_transactions").insert({
-      payment_id: payment.id,
+    const { error: txError } = await supabase.from("payment_transactions").insert({
+      payment_id: sale.payment_id,
       provider_reference: result.providerReference,
       idempotency_key: result.idempotencyKey,
       status: "success",
     });
+    if (txError) console.error("[checkout_cash_transaction]", txError);
   }
-
-  // 5. Inventory movements — one per line, decrementing stock via the
-  // trigger in supabase/migrations/0003 (never a raw stock write).
-  const movementRows = items.map((item) => ({
-    business_id: session.businessId!,
-    branch_id: branchId,
-    product_id: item.productId,
-    product_variant_id: item.productVariantId ?? null,
-    movement_type: "sale" as const,
-    quantity_change: -item.quantity,
-    reference_type: "sale",
-    reference_id: sale.id,
-    created_by: session.userId,
-  }));
-
-  const { error: movementError } = await supabase.from("inventory_movements").insert(movementRows);
-  if (movementError) {
-    console.error("[checkout_inventory_movements]", movementError);
-  }
-
-  // 6. Customer stats + a receipt row (PDF generation lands in Phase 8 —
-  // this just reserves the receipt number now).
-  if (customerId) {
-    await supabase.from("customer_transactions").insert({
-      customer_id: customerId,
-      sale_id: sale.id,
-      type: "sale",
-      amount: totalAmount,
-    });
-    const { data: customer } = await supabase
-      .from("customers")
-      .select("total_spent")
-      .eq("id", customerId)
-      .single();
-    await supabase
-      .from("customers")
-      .update({
-        total_spent: (customer?.total_spent ?? 0) + totalAmount,
-        last_purchase_at: new Date().toISOString(),
-      })
-      .eq("id", customerId);
-  }
-
-  await supabase.from("receipts").insert({
-    sale_id: sale.id,
-    receipt_number: generateReference("RCPT"),
-  });
 
   revalidatePath("/inventory");
   revalidatePath("/sales");
 
   return {
     success: true,
-    saleId: sale.id,
-    saleNumber,
-    total: totalAmount,
+    saleId: sale.sale_id,
+    saleNumber: sale.sale_number,
+    total: sale.total_amount,
     paymentStatus,
     message:
       paymentMethod === "mpesa" && paymentStatus === "pending"
