@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Loader2, Zap } from "lucide-react";
+import { Loader2, Receipt, Zap } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useCartStore } from "@/stores/cart-store";
 import { checkoutSale } from "@/server/actions/pos";
@@ -19,7 +19,7 @@ export function CheckoutButton({ branchId, embedToken }: { branchId: string; emb
   const clear = useCartStore((s) => s.clear);
   const [isPending, startTransition] = useTransition();
   const [isAwaitingMpesa, setIsAwaitingMpesa] = useState(false);
-  const [lastSale, setLastSale] = useState<{ saleNumber: string; total: number } | null>(null);
+  const [lastSale, setLastSale] = useState<{ saleId: string; saleNumber: string; total: number } | null>(null);
 
   const total = getEstimatedTotal();
   const disabled = items.length === 0 || isPending || isAwaitingMpesa;
@@ -64,7 +64,7 @@ export function CheckoutButton({ branchId, embedToken }: { branchId: string; emb
       });
 
       if (result.success) {
-        setLastSale({ saleNumber: result.saleNumber!, total: result.total! });
+        setLastSale({ saleId: result.saleId!, saleNumber: result.saleNumber!, total: result.total! });
         clear();
 
         if (paymentMethod === "mpesa" && result.paymentStatus === "pending") {
@@ -83,9 +83,20 @@ export function CheckoutButton({ branchId, embedToken }: { branchId: string; emb
   return (
     <div className="space-y-2">
       {lastSale && (
-        <p className="text-success text-center text-xs">
-          Last sale {lastSale.saleNumber} — {formatCurrency(lastSale.total)}
-        </p>
+        <div className="flex items-center justify-center gap-2 text-center text-xs">
+          <span className="text-success">
+            Last sale {lastSale.saleNumber} — {formatCurrency(lastSale.total)}
+          </span>
+          <a
+            href={`/api/receipts/${lastSale.saleId}${embedToken ? `?token=${embedToken}` : ""}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary inline-flex items-center gap-1 underline underline-offset-2"
+          >
+            <Receipt className="size-3" />
+            Receipt
+          </a>
+        </div>
       )}
       <div className="relative">
         {items.length > 0 && (
