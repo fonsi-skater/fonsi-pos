@@ -1,7 +1,7 @@
 export default function BranchesPage() {
   return (
     <div className="space-y-2">
-      <h1 className="text-2xl font-semibold tracking-tight">Branches</h1>
+      <h1 className="text-2xl font-semibold tracking-tight font-display">Branches</h1>
       <p className="text-muted-foreground">
         This module is scaffolded and ready for implementation in its dedicated phase.
       </p>

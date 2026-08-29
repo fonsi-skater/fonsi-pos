@@ -28,7 +28,7 @@ export default async function InventoryPage({
   if (!activeBranchId) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-semibold tracking-tight">Inventory</h1>
+        <h1 className="text-2xl font-semibold tracking-tight font-display">Inventory</h1>
         <p className="text-muted-foreground">Add a branch first to start tracking stock.</p>
       </div>
     );
@@ -45,7 +45,7 @@ export default async function InventoryPage({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Inventory</h1>
+          <h1 className="text-2xl font-semibold tracking-tight font-display">Inventory</h1>
           <p className="text-muted-foreground text-sm">Stock levels for the selected branch.</p>
         </div>
         <BranchSelector branches={branches} currentBranchId={activeBranchId} />

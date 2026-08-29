@@ -8,16 +8,17 @@ import { hasPermission } from "@/lib/permissions";
 import type { AppRole } from "@/types";
 import { cn } from "@/lib/utils";
 import { signOut } from "@/server/actions/auth";
+import { BrandMark } from "@/components/layout/brand-mark";
 
 export function Sidebar({ role, email }: { role: AppRole | null; email?: string }) {
   const pathname = usePathname();
 
   return (
     <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border hidden w-64 shrink-0 flex-col border-r md:flex">
-      <div className="flex h-14 items-center border-b px-6">
-        <span className="text-lg font-semibold tracking-tight">Fonsi POS</span>
+      <div className="flex h-14 items-center border-b border-sidebar-border px-5">
+        <BrandMark />
       </div>
-      <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
         {DASHBOARD_NAV.filter(
           (item) => !item.requiredPermission || hasPermission(role, item.requiredPermission)
         ).map((item) => {
@@ -28,10 +29,13 @@ export function Sidebar({ role, email }: { role: AppRole | null; email?: string 
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                // The left accent bar (not a full fill) is the one
+                // recurring "ledger rule" motif threaded through the
+                // whole dashboard — see docs/DESIGN.md.
+                "flex items-center gap-3 rounded-md border-l-2 px-3 py-2 text-sm font-medium transition-colors",
                 isActive
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  ? "border-sidebar-primary bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground/70 border-transparent hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
               )}
             >
               <Icon className="size-4" />

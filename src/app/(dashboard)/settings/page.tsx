@@ -14,7 +14,7 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+        <h1 className="text-2xl font-semibold tracking-tight font-display">Settings</h1>
         <p className="text-muted-foreground">
           This module is scaffolded and ready for implementation in its dedicated phase.
         </p>

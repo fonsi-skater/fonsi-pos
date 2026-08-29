@@ -6,30 +6,39 @@
 :root {
   --radius: 0.625rem;
 
-  /* Neutral base + a single brand accent used sparingly (POS "action" color) */
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  /*
+   * Dashboard theme — a light "ledger paper" surface anchored to the same
+   * violet hue (296) as the POS theme below, so the back-office and the
+   * checkout screen read as one brand instead of two unrelated apps (the
+   * old palette was plain shadcn grayscale with zero connection to POS).
+   * Kept high-lightness/low-chroma here on purpose: this is where staff
+   * read tables and numbers at a desk, so restraint wins over mood — the
+   * violet is a structural accent (nav, primary actions, active states,
+   * totals), not a wash over the whole screen. See docs/DESIGN.md.
+   */
+  --background: oklch(0.985 0.005 296);
+  --foreground: oklch(0.2 0.025 296);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.2 0.025 296);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
+  --popover-foreground: oklch(0.2 0.025 296);
 
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --primary: oklch(0.62 0.23 296);
+  --primary-foreground: oklch(0.99 0.005 296);
+  --secondary: oklch(0.95 0.012 296);
+  --secondary-foreground: oklch(0.25 0.03 296);
+  --muted: oklch(0.96 0.008 296);
+  --muted-foreground: oklch(0.5 0.02 296);
+  --accent: oklch(0.94 0.02 296);
+  --accent-foreground: oklch(0.25 0.03 296);
 
-  --destructive: oklch(0.577 0.245 27.325);
-  --success: oklch(0.627 0.17 149);
-  --warning: oklch(0.769 0.188 70.08);
+  --destructive: oklch(0.577 0.22 25);
+  --success: oklch(0.6 0.15 155);
+  --warning: oklch(0.74 0.16 75);
 
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: oklch(0.9 0.012 296);
+  --input: oklch(0.9 0.012 296);
+  --ring: oklch(0.62 0.23 296 / 0.5);
 
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
@@ -37,14 +46,21 @@
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
 
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /*
+   * The sidebar deliberately stays dark violet — the same values as the
+   * POS theme's sidebar — so the brand's "edges" (nav chrome) are
+   * consistent everywhere, while the content canvas stays light and
+   * calm. This is the one place the dashboard and POS themes share
+   * literal values, on purpose.
+   */
+  --sidebar: oklch(0.16 0.03 296);
+  --sidebar-foreground: oklch(0.95 0.01 296);
+  --sidebar-primary: oklch(0.62 0.23 296);
+  --sidebar-primary-foreground: oklch(0.99 0.005 296);
+  --sidebar-accent: oklch(0.24 0.035 293);
+  --sidebar-accent-foreground: oklch(0.97 0.01 296);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.62 0.23 296 / 0.5);
 }
 
 .dark {
@@ -162,12 +178,29 @@
   border: 1px solid var(--border);
 }
 
+/*
+ * A much quieter echo of .pos-glow-bg, for the light dashboard theme's
+ * auth pages (login/register) — ties them to the brand without importing
+ * POS's dark/vivid mood into a context that isn't touch-first or
+ * glanced-at. Two barely-there corner tints on the paper background.
+ */
+.paper-glow-bg {
+  background:
+    radial-gradient(ellipse 60% 50% at 8% -10%, oklch(0.62 0.23 296 / 0.08), transparent 60%),
+    radial-gradient(ellipse 55% 50% at 100% 110%, oklch(0.78 0.12 55 / 0.1), transparent 60%),
+    var(--background);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-  --font-display: ui-rounded, "SF Pro Rounded", "Nunito", var(--font-sans);
+  /* Self-hosted via @fontsource-variable/plus-jakarta-sans (imported in
+     src/app/layout.tsx) — headings, nav, brand wordmark, and numerals
+     throughout both the dashboard and POS themes. Body copy stays on the
+     system stack above for speed on data-dense screens. */
+  --font-display: "Plus Jakarta Sans Variable", ui-rounded, "SF Pro Rounded", "Nunito", var(--font-sans);
 
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);

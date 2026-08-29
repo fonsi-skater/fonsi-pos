@@ -35,7 +35,7 @@ export default async function ProductsPage({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Products</h1>
+          <h1 className="text-2xl font-semibold tracking-tight font-display">Products</h1>
           <p className="text-muted-foreground text-sm">{total} product{total === 1 ? "" : "s"} in your catalog</p>
         </div>
         {canManage && <ProductFormDialog businessId={session.businessId} categories={categories} />}

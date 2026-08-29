@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { Toaster } from "sonner";
+import "@fontsource-variable/plus-jakarta-sans";
 import "./globals.css";
 
-// Using the system font stack (declared in globals.css via --font-geist-sans
-// fallback) instead of next/font/google, since it removes a build-time
-// dependency on fetching fonts.googleapis.com — important for CI/sandboxed
-// environments with restricted network egress. Swap back to next/font/google
-// any time by restoring the Geist import here.
+// Plus Jakarta Sans (self-hosted via @fontsource, not next/font/google) is
+// the display face for headings, nav, and numerals — see docs/DESIGN.md.
+// Self-hosting via an npm package rather than next/font/google means no
+// build-time dependency on fetching fonts.googleapis.com, which matters
+// in network-restricted CI/sandbox environments.
 
 export const metadata: Metadata = {
   title: "Fonsi POS — Business Operations Platform",
